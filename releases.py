@@ -2,10 +2,11 @@ import sys
 from typing import Final
 
 LISTS_FEDORAPROJECT_ORG:Final = 'devel@lists.fedoraproject.org'
-
 FEDORAPROJECT_ORG:Final = 'epel-announce@lists.fedoraproject.org'
+KOJIHUB:Final = 'https://koji.fedoraproject.org/kojihub'
+PAGURE_URL:Final = 'https://src.fedoraproject.org'
+ORPHAN_UID:Final = 'orphan'
 
-KOJIHUB = 'https://koji.fedoraproject.org/kojihub'
 
 EPEL7_RELEASE = dict(
     repo='https://kojipkgs.fedoraproject.org/compose/updates/epel7/'
@@ -76,6 +77,3 @@ def eprint(*args, **kwargs) -> None:
     kwargs.setdefault('flush', True)
     print(*args, **kwargs)
 
-
-PAGURE_URL:Final = 'https://src.fedoraproject.org'
-ORPHAN_UID:Final = 'orphan'

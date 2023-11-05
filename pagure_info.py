@@ -9,7 +9,7 @@ from releases import RAWHIDE_RELEASE, eprint, PAGURE_URL
 
 
 class PagureInfo:
-    def __init__(self, package:str, branch:dict=RAWHIDE_RELEASE["pagure_branch"], ns:str='rpms') -> None:
+    def __init__(self, package:str, branch:str, ns:str='rpms') -> None:
         try:
             response = requests.get(f'{PAGURE_URL}/api/0/{ns}/{package}')
             response.raise_for_status()

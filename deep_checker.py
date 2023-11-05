@@ -7,13 +7,14 @@ from queue import Queue
 from threading import Thread
 
 import dnf
+from dnf.query import Query
 
 from pagure_info import PagureInfo
 from releases import RAWHIDE_RELEASE, eprint
 
 
 @lru_cache(maxsize=2048)
-def srpm_nvr_object(query: str, name: str, version: str, release: str) -> str:
+def srpm_nvr_object(query: Query, name: str, version: str, release: str) -> dnf.package.Package:
     try:
         return query.filter(name=name, version=version, release=release, arch='src').run()[0]
     except IndexError:
@@ -23,7 +24,7 @@ def srpm_nvr_object(query: str, name: str, version: str, release: str) -> str:
 
 
 def setup_dnf(repo: str,
-              source_repo: str) -> str:
+              source_repo: str) -> Query:
     """ Setup dnf query with two repos
     """
     base = dnf.Base()
@@ -43,10 +44,10 @@ def setup_dnf(repo: str,
 
 
 class DepChecker:
-    def __init__(self, release: str, branch) -> None:
+    def __init__(self, query: Query, branch:str) -> None:
         self._src_by_bin = self._bin_by_src = None
 
-        self.dnfquery = self.release = release
+        self.dnfquery = query
 
         self.branch = branch
         self.pagureinfo_queue = Queue()
@@ -69,13 +70,13 @@ class DepChecker:
         self._bin_by_src = bin_by_src
 
     @property
-    def by_src(self):
+    def by_src(self) -> dict:
         if not self._bin_by_src:
             self.__create_mapping()
         return self._bin_by_src
 
     @property
-    def by_bin(self):
+    def by_bin(self) -> dict:
         if not self._src_by_bin:
             self.__create_mapping()
         return self._src_by_bin
@@ -132,10 +133,10 @@ class DepChecker:
                 base_provide = base_provide.replace("[", "?")
                 base_provide = base_provide.replace("]", "?")
 
-            self.method_name23(base_provide, dependent_packages, ignore, prov, rpms, srpmname)
+            self.elide(base_provide, dependent_packages, ignore, prov, rpms, srpmname)
         return OrderedDict(sorted(dependent_packages.items()))
 
-    def method_name23(self, base_provide, dependent_packages, ignore, prov, rpms, srpmname):
+    def elide(self, base_provide:str, dependent_packages:dict, ignore:list, prov:str, rpms:list, srpmname:str) -> None:
         # Elide provide if also provided by another package
         for pkg in self.dnfquery.filter(provides=base_provide):
             # print("FIXME: might miss broken dependencies in case the other")
@@ -161,7 +162,7 @@ class DepChecker:
         while True:
             package = self.pagureinfo_queue.get()
             if package not in self.pagure_dict:
-                pkginfo = PagureInfo(package, self.branch)
+                pkginfo = PagureInfo(package=package, branch=self.branch)
                 qsize = self.pagureinfo_queue.qsize()
                 eprint(f"Got info for {package} on {self.branch}, todo: {qsize}")
                 self.pagure_dict[package] = pkginfo
@@ -190,7 +191,7 @@ class DepChecker:
         eprint("done")
         return dep_map, incomplete
 
-    def build_dep_map(self, incomplete, max_deps, packages, rpm_pkg_names) -> OrderedDict:
+    def build_dep_map(self, incomplete:list, max_deps:int, packages:list, rpm_pkg_names:list) -> OrderedDict:
         dep_map = OrderedDict()
         for name in sorted(packages):
             self.dep_chain[name] = set()  # explicitly initialize the set for the orphaned
@@ -216,8 +217,8 @@ class DepChecker:
                        f"'{name}', dependency check not completed")
         return dep_map
 
-    def allow_check(self, allow_more, check_next, dep_map:dict, dependent_packages:dict, ignore:list, incomplete:list, max_deps,
-                    name, seen, to_check) -> tuple[bool,list]:
+    def allow_check(self, allow_more:bool, check_next:str, dep_map:dict, dependent_packages:dict, ignore:list, incomplete:list, max_deps:int,
+                    name:str, seen:list, to_check:list) -> tuple[bool,list]:
         new_names = []
         new_srpm_names = set()
         for pkg, dependencies in dependent_packages.items():
@@ -254,7 +255,7 @@ class DepChecker:
         return allow_more, to_check
 
     # This function was stolen from pungi
-    def srpm(self, package) -> str:
+    def srpm(self, package:dnf.package.Package) -> dnf.package.Package:
         """Given a package object, get a package object for the
         corresponding source rpm. Requires dnf still configured
         and a valid package object."""
